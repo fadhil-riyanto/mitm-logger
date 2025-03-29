@@ -27,6 +27,13 @@ class BlockResource:
         print(f"path: {'/'.join(data.request.path_components)}")
         query_json = self._convert_mitm_multidic_json(data.request.query)
         print(f"query: {query_json}")
+
+    def intercept_stop_req(self, flow: http.HTTPFlow): 
+        flow.response = http.Response.make(
+            404,  # HTTP status code
+            b"Blocked",  # Response body
+            {"Content-Type": "text/html"}  # Headers
+        )
         
     
     def db_append_data(self, data: http.HTTPFlow):
@@ -62,17 +69,52 @@ class BlockResource:
 
                 self.stmt.commit()
 
+
+    def do_filter(self, flow: http.HTTPFlow):
+        target_hosts = flow.request.host.lower()
+
+        with self.stmt.cursor() as cur:
+            cur.execute("SELECT * FROM public.addr WHERE address = %s", (target_hosts,))
+            tmp = cur.fetchall()
+
+            if len(tmp) != 0:
+                if tmp[0][2] == True:
+                    print(f"action block domain {tmp[0][1]}")
+                    self.intercept_stop_req(flow)
+
+        with self.stmt.cursor() as cur:
+            cur.execute("SELECT * FROM public.addr WHERE address = %s", (target_hosts,))
+            tmp = cur.fetchall()
+
+            if len(tmp) != 0:
+                lookup_fg_id = tmp[0][0]
+
+                cur.execute("SELECT * FROM public.qs_mitm_history WHERE addr = %s AND path = %s AND blocked = TRUE", (
+                                    int(lookup_fg_id),
+                                    '/'.join(flow.request.path_components),
+                                ))
+                tmp = cur.fetchall()
+
+                # print(cur._last_executed)
+                print(f"len= {len(tmp)} id = {lookup_fg_id} path = {'/'.join(flow.request.path_components)}")
+                if len(tmp) != 0:
+                    self.intercept_stop_req(flow)
+                #     for a in tmp:
+                #         if a[2] == '/'.join(flow.request.path_components):
+                #             print(f"action block  path {tmp[0][1]}")
+                #             print(f"{'/'.join(flow.request.path_components)} ==== {tmp[0][2]}" )
+                #             self.intercept_stop_req(flow)
+
+            
+
         
     def request(self, flow: http.HTTPFlow) -> None:
         # if url_pattern.search(flow.request.pretty_url):
-        #     flow.response = http.Response.make(
-        #         404,  # HTTP status code
-        #         b"Blocked",  # Response body
-        #         {"Content-Type": "text/html"}  # Headers
-        #     )
+        #     
         # print(f"url -> {flow.request.pretty_url}")
         # self.db_append_data(flow)
         self.db_append_data(flow)
+        self.do_filter(flow)
 
 addons = [
     BlockResource()
