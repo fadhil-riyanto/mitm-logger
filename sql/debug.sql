@@ -25,12 +25,46 @@ SELECT * FROM public.addr WHERE address = 'www.fadev.org';
 
 SELECT 
     public.addr.address, 
-    public.qs_mitm_history.path 
+    public.qs_mitm_history.path,
+    public.qs_mitm_history.qs
 FROM
     public.addr 
 INNER JOIN 
     public.qs_mitm_history ON 
         public.addr.id = public.qs_mitm_history.addr 
     ORDER BY 
-        public.qs_mitm_history.unix
-    DESC;
+        public.qs_mitm_history.unix DESC
+     
+    LIMIT 200;
+
+
+
+SELECT 
+    public.addr.address, 
+    public.qs_mitm_history.path,
+    public.qs_mitm_history.qs
+FROM
+    public.addr 
+INNER JOIN 
+    public.qs_mitm_history ON 
+        public.addr.id = public.qs_mitm_history.addr 
+    ORDER BY 
+        public.qs_mitm_history.unix DESC NULLS LAST
+    limit 200;
+
+SELECT count(*) FROM public.qs_mitm_history LIMIT 200;
+
+SELECT 
+    public.addr.address, 
+    public.qs_mitm_history.path
+FROM
+    public.addr 
+INNER JOIN 
+    public.qs_mitm_history ON 
+        public.addr.id = public.qs_mitm_history.addr 
+    ORDER BY 
+        public.qs_mitm_history.unix DESC NULLS LAST
+    limit 200;
+
+
+SELECT * FROM public.qs_mitm_history WHERE addr = '1' AND path = '8uFr.json' AND blocked = TRUE
