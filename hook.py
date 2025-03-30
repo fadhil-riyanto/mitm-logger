@@ -81,6 +81,7 @@ class BlockResource:
                 if tmp[0][2] == True:
                     print(f"action block domain {tmp[0][1]}")
                     self.intercept_stop_req(flow)
+                    return True
 
         with self.stmt.cursor() as cur:
             cur.execute("SELECT * FROM public.addr WHERE address = %s", (target_hosts,))
@@ -99,13 +100,14 @@ class BlockResource:
                 print(f"len= {len(tmp)} id = {lookup_fg_id} path = {'/'.join(flow.request.path_components)}")
                 if len(tmp) != 0:
                     self.intercept_stop_req(flow)
+                    return True
                 #     for a in tmp:
                 #         if a[2] == '/'.join(flow.request.path_components):
                 #             print(f"action block  path {tmp[0][1]}")
                 #             print(f"{'/'.join(flow.request.path_components)} ==== {tmp[0][2]}" )
                 #             self.intercept_stop_req(flow)
 
-            
+        return False
 
         
     def request(self, flow: http.HTTPFlow) -> None:
@@ -113,8 +115,10 @@ class BlockResource:
         #     
         # print(f"url -> {flow.request.pretty_url}")
         # self.db_append_data(flow)
-        self.db_append_data(flow)
-        self.do_filter(flow)
+        ret = self.do_filter(flow)
+
+        if ret == False:
+            self.db_append_data(flow)
 
 addons = [
     BlockResource()
