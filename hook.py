@@ -15,6 +15,8 @@ class BlockResource:
             password=os.environ.get("DB_PASSWD")
         )
 
+        self.g_program_counter = 0
+
     def _convert_mitm_multidic_json(self, query):
         query_dict = MultiDict(query)
         query_json = json.dumps({key: query_dict.getall(key) for key in query_dict.keys()})
@@ -35,90 +37,182 @@ class BlockResource:
             {"Content-Type": "text/html"}  # Headers
         )
         
-    
-    def db_append_data(self, data: http.HTTPFlow):
-        target_hosts = data.request.host.lower()
+    def db_append_data(self, flow: http.HTTPFlow):
+        fqdn = flow.request.host.lower()
+        path = '/'.join(flow.request.path_components)
 
         with self.stmt.cursor() as cur:
-            cur.execute("SELECT * FROM public.addr WHERE address = %s", (target_hosts,))
-            tmp = cur.fetchall()
-            
-            if len(tmp) == 0:
-                ret = cur.execute("INSERT INTO public.addr (id, address) VALUES (DEFAULT, %s);", (target_hosts,))
-                self.stmt.commit()
-                
-                cur.execute("SELECT * FROM public.addr WHERE address = %s", (target_hosts,))
-                tmp = cur.fetchall()
-                print(f"[FOUND NEW SITE]: {tmp[0][0]} | {target_hosts}")
+            # check whatever domain already present
+            cur.execute("SELECT * FROM public.mitm_fqdn WHERE fqdn = %s LIMIT 1", (fqdn,))
+            fqdn_data = cur.fetchall();
 
-                ret = cur.execute("INSERT INTO public.qs_mitm_history (id, addr, path, qs, unix) VALUES (DEFAULT, %s, %s, %s, now());", (
-                    tmp[0][0],                                              # foreign key
-                    '/'.join(data.request.path_components),                 # path
-                    self._convert_mitm_multidic_json(data.request.query)    # json query string
-                ))
+            # fqdn not found
+            # path not found, do insert
+            if len(fqdn_data) == 0:
+                ret = cur.execute("""INSERT INTO 
+                                        public.mitm_fqdn (id, fqdn, blocked) 
+                                    VALUES (DEFAULT, %s, FALSE);""", (fqdn,))
+                print(f"append fqdn: {fqdn}")
 
-                self.stmt.commit()
+                # inserting & checking path
+                cur.execute("SELECT * FROM public.mitm_path WHERE path = %s LIMIT 1", (path,))
+                mitm_path_data = cur.fetchall();
+
+                if len(mitm_path_data) == 0:
+                    ret = cur.execute("""INSERT INTO 
+                                            public.mitm_path (id, path) 
+                                        VALUES (DEFAULT, %s);""", (path,))
+                    print(f"append fqdn on path: {path}")
+
             else:
-                print(f"[IDX FOUND] {tmp[0][0]}")
+                # fqdn found, idk about path
+                cur.execute("SELECT * FROM public.mitm_path WHERE path = %s LIMIT 1", (path,))
+                mitm_path_data = cur.fetchall();
 
-                ret = cur.execute("INSERT INTO public.qs_mitm_history (id, addr, path, qs, unix) VALUES (DEFAULT, %s, %s, %s, now());", (
-                    tmp[0][0],                                              # foreign key
-                    '/'.join(data.request.path_components),                 # path
-                    self._convert_mitm_multidic_json(data.request.query)    # json query string
-                ))
+                if len(mitm_path_data) == 0:
+                    ret = cur.execute("""INSERT INTO 
+                                            public.mitm_path (id, path) 
+                                        VALUES (DEFAULT, %s);""", (path,))
+                    print(f"append path: {path}")
 
+            # syncing
+            self.stmt.commit()
+
+            cur.execute("SELECT * FROM public.mitm_fqdn WHERE fqdn = %s LIMIT 1", (fqdn,))
+            fqdn_data = cur.fetchall();
+
+            cur.execute("SELECT * FROM public.mitm_path WHERE path = %s LIMIT 1", (path,))
+            mitm_path_data = cur.fetchall();
+
+
+            # find whatever data found first
+            cur.execute("""SELECT 
+                                *
+                            FROM 
+                                public.mitm_log_history
+                            WHERE
+                                mitm_fqdn_id = %s AND 
+                                mitm_path_id = %s 
+                            LIMIT 1""", (fqdn_data[0][0], mitm_path_data[0][0],))
+            mitm_log_history_data = cur.fetchall();
+            
+            if len(mitm_log_history_data) == 0:
+                ret = cur.execute("""INSERT INTO 
+                                            public.mitm_log_history (id, mitm_fqdn_id, mitm_path_id, blocked) 
+                                        VALUES (DEFAULT, %s, %s, FALSE);""", (
+                                                    fqdn_data[0][0],
+                                                    mitm_path_data[0][0],))
+                print(f"append history_data (fqdn, path) id: {fqdn_data[0][0]}, {mitm_path_data[0][0]}")
+
+                # syncing
                 self.stmt.commit()
+
+                # re-update mitm_log_history_data
+                cur.execute("""SELECT 
+                                    *
+                                FROM 
+                                    public.mitm_log_history
+                                WHERE
+                                    mitm_fqdn_id = %s AND 
+                                    mitm_path_id = %s 
+                                LIMIT 1""", (fqdn_data[0][0], mitm_path_data[0][0],))
+                mitm_log_history_data = cur.fetchall();
+
+            # global insert mitm_static_log
+            ret = cur.execute("""INSERT INTO 
+                                    public.mitm_static_log (id, mitm_log_history_id, query_string, unix) 
+                                VALUES (DEFAULT, %s, %s, now());""", (
+                                            mitm_log_history_data[0][0],
+                                            self._convert_mitm_multidic_json(flow.request.query),))
+
+            print(f"append static log mitm_log_history_id: {mitm_log_history_data[0][0]}")
+            
+            self.stmt.commit()
+
+            #     # insert static log
+            #     cur.execute("""SELECT 
+            #                     * 
+            #                 FROM
+            #                     public.mitm_static_log 
+            #                 WHERE
+            #                     mitm_fqdn_id = %s AND 
+            #                     mitm_path_id = %s
+            #                 LIMIT 1""", (fqdn_data[0][0], mitm_path_data[0][0], ))
+            #     mitm_static_log_data = cur.fetchall();
+
+            #     if len(mitm_static_log_data) == 0:
+            #         ret = cur.execute("""INSERT INTO 
+            #                                     public.mitm_static_log (id, mitm_log_history_id, query_string, unix) 
+            #                                 VALUES (DEFAULT, %s, %s, FALSE);""", (
+            #                                             fqdn_data[0][0],
+            #                                             mitm_path_data[0][0],))
+            #         self.stmt.commit()
+            # else:
+
+            
+
 
 
     def do_filter(self, flow: http.HTTPFlow):
-        target_hosts = flow.request.host.lower()
+        fqdn = flow.request.host.lower()
+        path = '/'.join(flow.request.path_components)
 
         with self.stmt.cursor() as cur:
-            cur.execute("SELECT * FROM public.addr WHERE address = %s", (target_hosts,))
-            tmp = cur.fetchall()
+            cur.execute("SELECT * FROM public.mitm_fqdn WHERE fqdn = %s LIMIT 1", (fqdn,))
+            data = cur.fetchall();
 
-            if len(tmp) != 0:
-                if tmp[0][2] == True:
-                    print(f"action block domain {tmp[0][1]}")
+            fqdn_found = len(data)
+            if fqdn_found == 1:
+                if data[0][2] == True:              # repr blocked == true
+                    print(f"[BLOCKED] {data[0][1]}")
                     self.intercept_stop_req(flow)
                     return True
 
-        with self.stmt.cursor() as cur:
-            cur.execute("SELECT * FROM public.addr WHERE address = %s", (target_hosts,))
-            tmp = cur.fetchall()
+            # check whatever blocked by path, query on public.mitm_log_history
+            cur.execute("SELECT * FROM public.mitm_path WHERE path = %s LIMIT 1", (path,))
+            mitm_path_data = cur.fetchall();
 
-            if len(tmp) != 0:
-                lookup_fg_id = tmp[0][0]
+            mitm_path_found = len(mitm_path_data)
 
-                cur.execute("SELECT * FROM public.qs_mitm_history WHERE addr = %s AND path = %s AND blocked = TRUE", (
-                                    int(lookup_fg_id),
-                                    '/'.join(flow.request.path_components),
-                                ))
-                tmp = cur.fetchall()
+            if mitm_path_found == 1:
+                mitm_fqdn_id = data[0][0]
+                mitm_path_id = mitm_path_data[0][0]
 
-                # print(cur._last_executed)
-                print(f"len= {len(tmp)} id = {lookup_fg_id} path = {'/'.join(flow.request.path_components)}")
-                if len(tmp) != 0:
+                print(f"fqdn {mitm_fqdn_id}, path {mitm_path_id}")
+                cur.execute("""SELECT EXISTS(SELECT 
+                                1 
+                            FROM 
+                                public.mitm_log_history 
+                            WHERE 
+                                mitm_fqdn_id = %s AND 
+                                mitm_path_id = %s AND
+                                blocked      = TRUE
+                            LIMIT 1)""", (mitm_fqdn_id, mitm_path_id, ))
+
+                data = cur.fetchall()
+                mitm_log_history_found = data[0][0]
+
+                if mitm_log_history_found == True:
                     self.intercept_stop_req(flow)
                     return True
-                #     for a in tmp:
-                #         if a[2] == '/'.join(flow.request.path_components):
-                #             print(f"action block  path {tmp[0][1]}")
-                #             print(f"{'/'.join(flow.request.path_components)} ==== {tmp[0][2]}" )
-                #             self.intercept_stop_req(flow)
 
         return False
-
         
     def request(self, flow: http.HTTPFlow) -> None:
         # if url_pattern.search(flow.request.pretty_url):
         #     
         # print(f"url -> {flow.request.pretty_url}")
         # self.db_append_data(flow)
+        # self._debug_flow(flow)
         ret = self.do_filter(flow)
 
         if ret == False:
             self.db_append_data(flow)
+
+        # if self.g_program_counter % 20 == 0:
+        #     # avoid re-commit
+        #     self.stmt.commit()
+        
 
 addons = [
     BlockResource()
