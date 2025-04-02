@@ -74,6 +74,18 @@
         die("Database connection failed: " . $e->getMessage());
     }
 
+    if (isset($_GET['regexp_block'])) {
+        $stmt = $pdo->prepare("
+            INSERT INTO 
+                public.mitm_regexp_blocking (id, regexp, active)
+            VALUES 
+                (DEFAULT, :regexp, TRUE);
+        ");
+        $stmt->execute([
+            "regexp" => $_GET["regexp_block"]
+        ]);
+    }
+
     if (isset($_GET["block_domain_id"])) {
         $stmt = $pdo->prepare("
             UPDATE public.addr
@@ -137,6 +149,24 @@
                 "clear_id" => isset($_GET["clear_path"]) ? $_GET["clear_path"] : false
             ]);
         }
+    } else if (isset($_GET["change_regexp_state_deactivate"])) {
+        $stmt = $pdo->prepare("
+            UPDATE public.mitm_regexp_blocking
+            SET active = FALSE
+            WHERE id = :change_regexp_state_deactivate
+        ");
+        $stmt->execute([
+            "change_regexp_state_deactivate" => isset($_GET["change_regexp_state_deactivate"]) ? $_GET["change_regexp_state_deactivate"] : false
+        ]);
+    } else if (isset($_GET["change_regexp_state_activate"])) {
+        $stmt = $pdo->prepare("
+            UPDATE public.mitm_regexp_blocking
+            SET active = TRUE
+            WHERE id = :change_regexp_state_activate
+        ");
+        $stmt->execute([
+            "change_regexp_state_activate" => isset($_GET["change_regexp_state_activate"]) ? $_GET["change_regexp_state_activate"] : false
+        ]);
     }
 
     ?>
@@ -146,7 +176,9 @@
         <div class="bar">
             <a class='darkblue' href="/">all</a> |
             <a class='darkblue' href="/?search=list_blocked_domain&limit=200">list_blocked_domain</a> |
-            <a class='darkblue' href="/?search=list_blocked_path&limit=200">list_blocked_path</a>
+            <a class='darkblue' href="/?search=list_blocked_path&limit=200">list_blocked_path</a> |
+            <a class='darkblue' href="/?search=list_blocked_regexp&limit=200">list_blocked_regexp</a> | 
+            <a class='darkblue' href="/?server_stats=1">server_stats</a>
 
 
         </div>
@@ -176,6 +208,43 @@
         </div>
     </div>
 
+    
+    <?php
+    if (isset($_GET["server_stats"])) {
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM public.addr
+        ");
+        $stmt->execute([]);
+        $addr_count = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmt = $pdo->prepare("
+            SELECT COUNT(*) FROM public.qs_mitm_history
+        ");
+        $stmt->execute([]);
+        $history_mitm_count = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmt = $pdo->prepare("
+            SELECT pg_size_pretty( pg_database_size(:dbname) );
+        ");
+        $stmt->execute([
+            "dbname" => getenv('DB_NAME') ?: 'mitm_logs'
+        ]);
+        $db_size = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+
+        echo "<div class=\"col\">";
+        echo "addr count(*): " . $addr_count[0]["count"] . "<br>";
+        echo "mitm_history count(*): " . $history_mitm_count[0]["count"] . "<br>";
+        echo "db size: " . $db_size[0]["pg_size_pretty"] . "<br>";
+        
+    
+        echo "</div>";
+
+        exit();
+    }
+    ?>
+
+
     <div class="col">
         <h3>recent log (200 entries)</h3>
 
@@ -183,9 +252,9 @@
             <thead>
                 <tr>
                     <th>#</th>
-                    <th>domain/subdomain</th>
+                    <th>domain/subdomain/regexp</th>
                     <th>act</th>
-                    <th>path</th>
+                    <th>path/regexstate</th>
                     <th>QUERY STRING</th>
 
                 </tr>
@@ -231,7 +300,19 @@
                                 LIMIT :limit;
                                 "
                             );
-                        }
+                        } else if ($_GET['search'] == 'list_blocked_regexp') {
+                            $stmt = $pdo->prepare(
+                                "
+                                SELECT 
+                                    public.mitm_regexp_blocking.id,
+                                    public.mitm_regexp_blocking.regexp as regexp,
+                                    public.mitm_regexp_blocking.active
+                                FROM 
+                                    public.mitm_regexp_blocking
+                                LIMIT :limit;
+                                "
+                            );
+                        } 
                     } else {
 
                         $stmt = $pdo->prepare("
@@ -272,25 +353,42 @@
                     echo "<tr>";
                     echo "<td>" . ($index + 1) . "</td>";
 
-                    if ($log["domain_block"] === true) {
-                        // echo "<td>" . $log["domain_block"] . "</td>";
-                        echo "<td class='block_domain_clr'>" . htmlspecialchars($log['address']) . "</td>";
+                    if (isset($log['regexp'])) {
+                        echo "<td>" . htmlspecialchars($log['regexp']) . "</td>";
                     } else {
-                        // echo "<td>" . $log["domain_block"] . "</td>";
-                        echo "<td>" . htmlspecialchars($log['address']) . "</td>";
+                        if ($log["domain_block"] === true) {
+                            // echo "<td>" . $log["domain_block"] . "</td>";
+                            echo "<td class='block_domain_clr'>" . htmlspecialchars($log['address']) . "</td>";
+                        } else {
+                            // echo "<td>" . $log["domain_block"] . "</td>";
+                            echo "<td>" . htmlspecialchars($log['address']) . "</td>";
+                        }
                     }
-                    echo "<td>" .
-                        "<a href=\"?block_domain_id=" . $log["addr_id"] . "\" class=\"mitmbutton\">block_domain</a>" .
-                        "<a href=\"?block_path_id=" . $log["path_id"] . "\" class=\"mitmbutton\">block_path_and_domain</a>" .
-                        "<a href=\"?clear_domain=" . $log["addr_id"] . "&clear_path=" . $log["path_id"] . "\" class=\"mitmbutton\">cls</a>" .
-                        "</td>";
 
-                    if ($log["path_block_bool"] === true) {
-                        // echo "<td>" . $log["domain_block"] . "</td>";
-                        echo "<td class='block_path_clr tbl-wordrwap'>" . htmlspecialchars($log['path']) . "</td>";
+
+                    if (isset($log['regexp'])) {
+                        echo "<td>" .
+                            "<a href=\"?change_regexp_state_deactivate=" . $log["id"] . "\" class=\"mitmbutton\">deactivate rule</a>" .
+                            "<a href=\"?change_regexp_state_activate=" . $log["id"] . "\" class=\"mitmbutton\">activate rule</a>" .
+                            "</td>";
                     } else {
-                        // echo "<td>" . $log["domain_block"] . "</td>";
-                        echo "<td class='tbl-wordrwap'>" . htmlspecialchars($log['path']) . "</td>";
+                        echo "<td>" .
+                            "<a href=\"?block_domain_id=" . $log["addr_id"] . "\" class=\"mitmbutton\">block_domain</a>" .
+                            "<a href=\"?block_path_id=" . $log["path_id"] . "\" class=\"mitmbutton\">block_path_and_domain</a>" .
+                            "<a href=\"?clear_domain=" . $log["addr_id"] . "&clear_path=" . $log["path_id"] . "\" class=\"mitmbutton\">cls</a>" .
+                            "</td>";
+                    }
+
+                    if (isset($log['regexp'])) {
+                        echo "<td class='tbl-wordrwap'>" . htmlspecialchars($log['active']) . "</td>";
+                    } else {
+                        if ($log["path_block_bool"] === true) {
+                            // echo "<td>" . $log["domain_block"] . "</td>";
+                            echo "<td class='block_path_clr tbl-wordrwap'>" . htmlspecialchars($log['path']) . "</td>";
+                        } else {
+                            // echo "<td>" . $log["domain_block"] . "</td>";
+                            echo "<td class='tbl-wordrwap'>" . htmlspecialchars($log['path']) . "</td>";
+                        }
                     }
                     // echo "<td>" . htmlspecialchars($log['path']) . "</td>";
                     echo "<td>" . $log['qs'] . "</td>";
