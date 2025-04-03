@@ -1,0 +1,19 @@
+{
+    "name": "fadhil_riyanto/mitm-logger-web",
+    "autoload": {
+        "psr-4": {
+            "FadhilRiyanto\\MitmLoggerWeb\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "fadhil riyanto",
+            "email": "me@fadev.org"
+        }
+    ],
+    "require": {
+        "slim/slim": "4.*",
+        "guzzlehttp/psr7": "^2",
+        "twig/twig": "^3.0"
+    }
+}
