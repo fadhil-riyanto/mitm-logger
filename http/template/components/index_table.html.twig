@@ -1,26 +1,76 @@
-<table class="uk-table uk-table-justify uk-table-divider">
-    <thead>
-        <tr>
-            <th class="uk-width-small">#</th>
-            <th>Links</th>
-            <th>Data</th>
-            <th>timestamp</th>
-            <th>Act</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for datas in datas %}
-        <tr>
-            <td>{{ datas.id }}</td>
-            <td><a href="//{{ datas.url }}">{{ datas.url }}</a></td>
-            <td>{{ datas.qs }}</td>
-            <td>{{ datas.timestamp }}</td>
-            
-            <td>
-                <button class="uk-button uk-button-default" type="button">block</button>
-                <button class="uk-button uk-button-default" type="button">block domain</button>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="uk-overflow-auto">
+    <table class="uk-table uk-table-hover uk-table-middle uk-table-divider">
+        <thead>
+            <tr>
+                <th class="uk-table-shrink">#</th>
+                <th class="uk-table-expand">Links</th>
+                <!-- <th>Data</th> -->
+                <th class="uk-table-shrink">timestamp</th>
+                <th class="uk-table-shrink">block</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for data in datas %}
+            <tr id="row-{{ data.no }}">
+                <td>{{ data.no }}</td>
+                <td class="uk-text-truncate"><a href="//{{ data.url }}">{{ data.url }}</a></td>
+                <!-- <td>{{ data.qs }}</td> -->
+                <td>{{ data.timestamp }}</td>
+
+                <td>
+                    <button class="uk-button uk-button-default mitm-btn-handler-block-mitm-log-history-id"
+                        data-mitm-log-history-id='{{ data.mitm_log_history_id }}' type="button">path</button>
+                    <button class="uk-button uk-button-default mitm-btn-handler-block-fqdn-id"
+                        data-fqdn-id='{{ data.fqdn_id }}' type="button">fqdn</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<script>
+    $(document).ready(function () {
+        $('.mitm-btn-handler-block-mitm-log-history-id').click(function () {
+            var id = $(this).data('mitm-log-history-id');
+            console.log(`start block path id: ${id}`);
+            $.ajax({
+                type: 'GET',
+                url: '/api/mitm_log_history_changestate',
+                data: { 
+                    mitm_log_history_id: id ,
+                    mode: 'block'
+                },
+                success: function (response) {
+                    // Handle success response
+                    console.log(response);
+                },
+                error: function (error) {
+                    // Handle error response
+                    console.error(error);
+                }
+            });
+        });
+
+        $('.mitm-btn-handler-block-fqdn-id').click(function () {
+            var id = $(this).data('fqdn-id');
+            console.log(`start block fqdn id: ${id}`);
+            $.ajax({
+                type: 'GET',
+                url: '/api/fqdn_changestate',
+                data: { 
+                    fqdn_id: id ,
+                    mode: 'block'
+                },
+                success: function (response) {
+                    // Handle success response
+                    console.log(response);
+                },
+                error: function (error) {
+                    // Handle error response
+                    console.error(error);
+                }
+            });
+        });
+    });
+</script>

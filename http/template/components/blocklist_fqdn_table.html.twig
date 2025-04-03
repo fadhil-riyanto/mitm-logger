@@ -1,0 +1,23 @@
+{% set id = 1 %}
+<table class="uk-table uk-table-justify uk-table-divider">
+    <thead>
+        <tr>
+            <th class="uk-table-shrink">#</th>
+            <th class="uk-table-expand">FQDN</th>
+            <th class="uk-table-shrink">act</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for datas in datas %}
+        <tr>
+            <td>{{ id }}</td>
+            <td><a href="//{{ datas.fqdn }}">{{ datas.fqdn }}</a></td>
+            
+            <td>
+                <button class="uk-button uk-button-default" type="button">unblock</button>
+            </td>
+        </tr>
+            {% set id = id + 1 %}
+        {% endfor %}
+    </tbody>
+</table>
