@@ -206,11 +206,13 @@ class BlockResource:
         # print(f"url -> {flow.request.pretty_url}")
         # self.db_append_data(flow)
         # self._debug_flow(flow)
-        ret = self.do_filter(flow)
+        try:
+            ret = self.do_filter(flow)
 
-        if ret == False:
-            self.db_append_data(flow)
-
+            if ret == False:
+                self.db_append_data(flow)
+        except psycopg2.errors.InFailedSqlTransaction:
+            self.stmt.rollback()
         # if self.g_program_counter % 20 == 0:
         #     # avoid re-commit
         #     self.stmt.commit()
