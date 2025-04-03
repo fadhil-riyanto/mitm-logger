@@ -1,0 +1,26 @@
+<table class="uk-table uk-table-justify uk-table-divider">
+    <thead>
+        <tr>
+            <th class="uk-width-small">#</th>
+            <th>Links</th>
+            <th>Data</th>
+            <th>timestamp</th>
+            <th>Act</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for datas in datas %}
+        <tr>
+            <td>{{ datas.id }}</td>
+            <td><a href="//{{ datas.url }}">{{ datas.url }}</a></td>
+            <td>{{ datas.qs }}</td>
+            <td>{{ datas.timestamp }}</td>
+            
+            <td>
+                <button class="uk-button uk-button-default" type="button">block</button>
+                <button class="uk-button uk-button-default" type="button">block domain</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
