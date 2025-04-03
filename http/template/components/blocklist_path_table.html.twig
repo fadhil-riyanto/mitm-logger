@@ -3,7 +3,7 @@
     <thead>
         <tr>
             <th class="uk-table-shrink">#</th>
-            <th class="uk-table-expand">FQDN</th>
+            <th class="uk-table-expand">path</th>
             <th class="uk-table-shrink">act</th>
         </tr>
     </thead>
@@ -11,10 +11,10 @@
         {% for datas in datas %}
         <tr>
             <td>{{ id }}</td>
-            <td><a href="//{{ datas.fqdn }}">{{ datas.fqdn }}</a></td>
+            <td><a href="//{{ datas.path }}">{{ datas.path }}</a></td>
             
             <td>
-                <button class="uk-button uk-button-default mitm-btn-handler-unblock-fqdn-id" type="button" data-fqdn-id="{{ datas.id }}">unblock</button>
+                <button class="uk-button uk-button-default mitm-btn-handler-unblock-mitm-log-history-id" data-mitm-log-history-id="{{ datas.id }}" type="button">unblock</button>
             </td>
         </tr>
             {% set id = id + 1 %}
@@ -22,18 +22,17 @@
     </tbody>
 </table>
 
-
 <script>
     $(document).ready(function () {
 
-        $('.mitm-btn-handler-unblock-fqdn-id').click(function () {
-            var id = $(this).data('fqdn-id');
-            console.log(`start unblock fqdn id: ${id}`);
+        $('.mitm-btn-handler-unblock-mitm-log-history-id').click(function () {
+            var id = $(this).data('mitm-log-history-id');
+            console.log(`start unblock path id: ${id}`);
             $.ajax({
                 type: 'GET',
-                url: '/api/fqdn_changestate',
+                url: '/api/mitm_log_history_changestate',
                 data: { 
-                    fqdn_id: id ,
+                    mitm_log_history_id: id ,
                     mode: 'unblock'
                 },
                 success: function (response) {

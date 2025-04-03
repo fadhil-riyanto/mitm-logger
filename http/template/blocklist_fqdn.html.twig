@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MITM blocker control panel</title>
+    <link rel="stylesheet" href="assets/css/uikit.min.css">
+    <link rel="stylesheet" href="assets/datatables/dataTables.dataTables.min.css">
+    <script src="assets/js/uikit.min.js"></script>
+    <script src="assets/datatables/dataTables.min.js"></script>
+    <script src="assets/js/jquery-3.7.1.min.js"></script>
+</head>
+
+<body>
+    {% include 'components/nav.html.twig' %}
+    <div class="uk-container">
+        {% include 'components/blocklist_fqdn_table.html.twig' %}
+    </div>
+</body>
+
+</html>

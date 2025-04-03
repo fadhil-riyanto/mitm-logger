@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MITM blocker control panel</title>
+    <link rel="stylesheet" href="assets/css/uikit.min.css">
+    <link rel="stylesheet" href="assets/datatables/dataTables.dataTables.min.css">
+    <script src="assets/js/uikit.min.js"></script>
+    <script src="assets/datatables/dataTables.min.js"></script>
+    <script src="assets/js/jquery-3.7.1.min.js"></script>
+</head>
+
+<body>
+    {% include 'components/nav.html.twig' %}
+    <div class="uk-container">
+        <table class="uk-table">
+            <thead>
+                <tr>
+                    <th>Stats Name</th>
+                    <th>data</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>FQDN count</td>
+                    <td id="fqdn">0</td>
+                </tr>
+                <tr>
+                    <td>path count</td>
+                    <td id="path">0</td>
+                </tr>
+                <tr>
+                    <td>history count</td>
+                    <td id="history">0</td>
+                </tr>
+                <tr>
+                    <td>static log count</td>
+                    <td id="static">0</td>
+                </tr>
+                <tr>
+                    <td>DB size</td>
+                    <td id="size">0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</body>
+
+<script>
+    $(document).ready(function () {
+        (function do_update() {
+            $.ajax({
+                url: '/api/get_server_stats',
+                method: 'GET',
+                success: function (data) {
+                    console.log(data)
+                    $("#fqdn").html(data.fqdn_count)
+                    $("#path").html(data.path_count)
+                    $("#history").html(data.mitm_log_history_count)
+                    $("#static").html(data.static_log_count)
+                    $("#size").html(data.db_size)
+
+                }
+            }).then(function() {
+                setTimeout(do_update, 100);
+            })
+        })()
+    })
+</script>
+
+</html>
