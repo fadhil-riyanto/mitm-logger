@@ -47,6 +47,8 @@ CREATE INDEX idx_public_mitm_fqdn ON public.mitm_fqdn(fqdn);
 CREATE INDEX idx_public_mitm_path ON public.mitm_path(path);
 
 
+DROP INDEX idx_public_mitm_fqdn;
+DROP INDEX idx_public_mitm_path;
 DROP TABLE public.mitm_regexp;
 DROP TABLE public.mitm_static_log;
 DROP table public.mitm_log_history;
